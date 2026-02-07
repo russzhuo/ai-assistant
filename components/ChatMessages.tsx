@@ -3,10 +3,10 @@
 import { useEffect, useRef } from "react";
 import { MessageItem } from "./MessageItem";
 import LoadingIndicator from "./LoadingIndicator";
-import { MessageRow } from "@/types/supabase";
+import { UIMessage } from "ai";
 
 type ChatMessagesProps = {
-  messages: MessageRow[];
+  messages: UIMessage[];
   isLoading: boolean;
 };
 

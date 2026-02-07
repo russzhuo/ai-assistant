@@ -62,9 +62,9 @@ export default function ChatRoom() {
 
   const isLoading = status === "submitted";
   const isReady = status === "ready";
-  const { isSignedIn, isLoaded } = useUser();
-  const pathname = usePathname();
-  const router = useRouter();
+  // const { isSignedIn, isLoaded } = useUser();
+  // const pathname = usePathname();
+  // const router = useRouter();
 
   // useEffect(() => {
   //   if (!isLoaded || isSignedIn || !router) {

@@ -1,10 +1,9 @@
-import { MessageRow } from "@/types/supabase";
-import cn from "classnames";
-import MessageContent from "./MessageContent";
 import MessageBubble from "./MessageBubble";
+import { UIMessage } from "ai";
+import cn from "classnames";
 
 type MessageItemProps = {
-  message: MessageRow;
+  message: UIMessage;
 };
 
 export const MessageItem: React.FC<MessageItemProps> = ({ message }) => {

@@ -6,7 +6,7 @@ import { themes, Prism } from "prism-react-renderer";
 import remarkGfm from "remark-gfm";
 import rehypeRaw from "rehype-raw"; // optional — if you need raw HTML
 import { Button } from "@douyinfe/semi-ui-19";
-import { Clipboard, ClipboardCheck, Copy, Cross } from "lucide-react";
+import { Clipboard, ClipboardCheck } from "lucide-react";
 import { useCopyToClipboard } from "usehooks-ts";
 
 (typeof global !== "undefined" ? global : window).Prism = Prism;

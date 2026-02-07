@@ -3,12 +3,12 @@ import UnsupportedMessagePart from "./UnsupportedMessagePart";
 import { CurrentWeatherDisplay, DailyForecast } from "../lib/utils/whether";
 import { WebSearchOutput } from "@/types/exa";
 import WebSearchResults from "./WebSearchResults";
-import { MessageRow } from "@/types/supabase";
 import { MemoizedMarkdown } from "./MemorizedMarkdown";
 import { ToolPending } from "./ToolPending";
+import { UIMessage } from "ai";
 
 interface MessageContentProps {
-  message: MessageRow;
+  message: UIMessage;
 }
 
 export default function MessageContent({ message }: MessageContentProps) {

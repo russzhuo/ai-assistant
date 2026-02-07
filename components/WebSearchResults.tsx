@@ -52,8 +52,6 @@ export default function WebSearchResults({
 
                     <p className="mt-1.5 text-sm text-muted-foreground line-clamp-2">
                       {item.text ||
-                        item.snippet ||
-                        item.description ||
                         "No preview available"}
                     </p>
 
