@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@plugin "@tailwindcss/typography";
 
 :root {
   --background: #ffffff;
@@ -12,11 +13,55 @@
   --font-mono: var(--font-geist-mono);
 }
 
+@layer base {
+  .user-message
+    .prose
+    :where(
+      p,
+      li,
+      h1,
+      h2,
+      h3,
+      h4,
+      h5,
+      h6,
+      blockquote,
+      strong,
+      em,
+      a,
+      code,
+      pre code,
+      th,
+      td
+    ):not(:where([class~="not-prose"] *)) {
+    @apply text-white;
+  }
+
+  .prose pre:has(> pre) {
+    @apply m-0! p-0!
+
+  }
+
+    .prose pre:has(> div.relative) {
+    @apply m-0! p-0!
+
+  }
+
+}
+
+@theme {
+  --color-frost-white: #f6f6f7;
+}
+
 @media (prefers-color-scheme: dark) {
   :root {
     --background: #0a0a0a;
     --foreground: #ededed;
   }
+}
+
+@utility prose {
+  --tw-prose-pre-bg: var(--color-gray-50);
 }
 
 body {
