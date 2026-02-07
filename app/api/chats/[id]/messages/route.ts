@@ -6,7 +6,7 @@ import { saveMessageToSupabase } from "@/lib/db/messages";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { weatherTool } from "@/lib/tools/weather";
 import { currentUser } from "@clerk/nextjs/server";
-import { convertToModelMessages, stepCountIs, streamText, UIMessage } from "ai";
+import { convertToModelMessages, streamText, UIMessage } from "ai";
 import { webSearch } from "@exalabs/ai-sdk";
 
 export async function POST(
@@ -19,7 +19,7 @@ export async function POST(
       return unauthorized();
     }
 
-    const { id: chatId, ...others } = await params;
+    const { id: chatId } = await params;
 
     if (!chatId || typeof chatId !== "string" || chatId.trim() === "") {
       return badRequest(`Chat ID is required and must be a non-empty string`);

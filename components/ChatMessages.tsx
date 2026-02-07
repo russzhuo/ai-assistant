@@ -1,12 +1,12 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { Message } from "@/types/chat";
 import { MessageItem } from "./MessageItem";
 import LoadingIndicator from "./LoadingIndicator";
+import { MessageRow } from "@/types/supabase";
 
 type ChatMessagesProps = {
-  messages: Message[];
+  messages: MessageRow[];
   isLoading: boolean;
 };
 

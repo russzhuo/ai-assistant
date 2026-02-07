@@ -127,7 +127,7 @@ export const useChatData = (chatId: string | null, userId: string | null) => {
       if (chatError) throw chatError;
       if (!chatData) throw new Error("Chat not found");
 
-      // console.log("chatId: ", chatId);
+      console.log("chatId: ", chatId);
       const { data: messages, error: msgError } = await supabaseClient
         .from("messages")
         .select("*")
@@ -162,7 +162,7 @@ export const useChatData = (chatId: string | null, userId: string | null) => {
           filter: `id=eq.${chatId}`,
         },
         (payload) => {
-          // console.log("Realtime title update:" + payload.new.title);
+          console.log("Realtime title update:" + payload.new.title);
 
           refetch();
 

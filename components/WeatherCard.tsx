@@ -27,7 +27,7 @@ const WeatherCard: React.FC<WeatherCardProps> = ({ current, forecast }) => {
     <div
       className="
         w-full max-w-sm mx-auto overflow-hidden rounded-2xl
-        bg-gradient-to-br from-[#0181C2] via-[#04A7F9] to-[#4BC4F7]
+        bg-linear-to-br from-[#0181C2] via-[#04A7F9] to-[#4BC4F7]
         shadow-2xl text-white
       "
     >
@@ -87,7 +87,7 @@ const WeatherCard: React.FC<WeatherCardProps> = ({ current, forecast }) => {
               <p className="text-gray-600 font-medium mb-1">{day.day}</p>
 
               <img
-                src={getIconUrl(day.iconCode ?? day.icon)}
+                src={getIconUrl(day.iconCode)}
                 alt={day.condition}
                 className="w-10 h-10 my-1.5"
                 loading="lazy"
