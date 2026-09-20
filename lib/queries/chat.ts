@@ -107,7 +107,7 @@ export const useOwnedChats = () => {
         .from("chats")
         .select("*")
         .eq("user_id", userId)
-        .order("updated_at", { ascending: true });
+        .order("updated_at", { ascending: false });
 
       if (chatsError) {
         throw chatsError;

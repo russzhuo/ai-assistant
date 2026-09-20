@@ -48,7 +48,7 @@ export async function POST(
         : null;
     const isResume = Boolean(resumePartialText);
 
-    console.log(`persistUserMessage: `, persistUserMessage, `isResume: `, isResume);
+    // console.log(`persistUserMessage: `, persistUserMessage, `isResume: `, isResume);
     const lastMessage = messages[messages.length - 1];
     const hasText = lastMessage?.parts?.some(
       (p) => p.type === "text" && p.text?.trim(),

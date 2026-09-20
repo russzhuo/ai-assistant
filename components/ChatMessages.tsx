@@ -22,14 +22,42 @@ export function ChatMessages({
   onDiscard,
   continueDisabled = false,
 }: ChatMessagesProps) {
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  // Whether the view is pinned to the bottom. Starts true so the latest
+  // messages show on first load; turns false when the user scrolls up.
+  const stickToBottomRef = useRef(true);
+  const prevLengthRef = useRef(0);
 
-  // useEffect(() => {
-  //   messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  // }, [messages, isLoading, interruptedMessageId]);
+  const handleScroll = () => {
+    const el = containerRef.current;
+    if (!el) return;
+    const distanceFromBottom =
+      el.scrollHeight - el.scrollTop - el.clientHeight;
+    stickToBottomRef.current = distanceFromBottom < 120;
+  };
+
+  useEffect(() => {
+    if (!stickToBottomRef.current) return;
+    const el = containerRef.current;
+    if (!el) return;
+
+    // Smooth-scroll for a newly added message; follow instantly while the
+    // assistant is streaming tokens in.
+    const isNewMessage = messages.length > prevLengthRef.current;
+    prevLengthRef.current = messages.length;
+
+    el.scrollTo({
+      top: el.scrollHeight,
+      behavior: isNewMessage ? "smooth" : "auto",
+    });
+  }, [messages, isLoading]);
 
   return (
-    <div className="flex-1 min-h-0 overflow-y-auto px-4 py-6">
+    <div
+      ref={containerRef}
+      onScroll={handleScroll}
+      className="flex-1 min-h-0 overflow-y-auto px-4 py-6"
+    >
       <div className="mx-auto w-full max-w-4xl space-y-6">
         {messages.map((m) => (
           <MessageItem
@@ -43,8 +71,6 @@ export function ChatMessages({
         ))}
 
         {isLoading && <LoadingIndicator />}
-
-        <div ref={messagesEndRef} />
       </div>
     </div>
   );
