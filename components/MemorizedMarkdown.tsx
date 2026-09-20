@@ -118,7 +118,7 @@ export const MemoizedMarkdown = memo(
     const blocks = useMemo(() => parseMarkdownIntoBlocks(content), [content]);
 
     return (
-      <div className="prose lg:prose-lg">
+      <div className="prose md:prose-md prose-p:my-1 prose-p:leading-relaxed">
         {blocks.map((block, index) => (
           <MemoizedMarkdownBlock content={block} key={`${id}-block_${index}`} />
         ))}

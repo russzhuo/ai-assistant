@@ -9,14 +9,17 @@ interface WebSearchResultsProps {
   messageId: string;
 }
 
+// Unit test focuses on individual modules, each module of the software is tested separately.
+// Integration test examines how 2 or more modules work together and if they are interacted with each other correctly
+
 export default function WebSearchResults({
   summary,
   results,
   messageId,
 }: WebSearchResultsProps) {
   return (
-    <div className="my-6 rounded-xl bg-card/50 border border-gray-200/70 bg-frost-white">
-      <div className="border-b border-gray-200/70 px-4 py-3 bg-muted/40">
+    <div className="my-6 rounded-xl bg-white border border-gray-200/70">
+      <div className="border-b border-gray-200/70 px-4 py-3 bg-gray-50/70">
         <div className="flex items-center gap-2.5">
           <strong>Web Search Results</strong>
         </div>
@@ -46,16 +49,17 @@ export default function WebSearchResults({
                   )}
 
                   <div className="min-w-0 flex-1">
-                    <h4 className="font-medium leading-snug text-foreground group-hover:text-primary transition-colors line-clamp-2">
+                    <h4 className="font-medium leading-snug text-gray-800 group-hover:text-blue-600 transition-colors line-clamp-2">
                       {item.title}
                     </h4>
 
-                    <p className="mt-1.5 text-sm text-muted-foreground line-clamp-2">
+                    <p className="mt-1.5 text-sm text-gray-500 line-clamp-2">
                       {item.text ||
                         "No preview available"}
                     </p>
 
-                    <div className="mt-1.5 text-xs text-muted-foreground/75 truncate">
+
+                    <div className="mt-1.5 text-xs text-gray-400 truncate">
                       {item.url}
                     </div>
                   </div>
@@ -64,7 +68,7 @@ export default function WebSearchResults({
             ))}
           </div>
         ) : (
-          <div className="py-8 text-center text-sm text-muted-foreground italic">
+          <div className="py-8 text-center text-sm text-gray-400 italic">
             No search results found
           </div>
         )}

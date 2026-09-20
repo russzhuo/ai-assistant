@@ -5,6 +5,7 @@ import { WebSearchOutput } from "@/types/exa";
 import WebSearchResults from "./WebSearchResults";
 import { MemoizedMarkdown } from "./MemorizedMarkdown";
 import { ToolPending } from "./ToolPending";
+import ReasoningDisplay from "./ReasoningDisplay";
 import { UIMessage } from "ai";
 
 interface MessageContentProps {
@@ -24,6 +25,32 @@ export default function MessageContent({ message }: MessageContentProps) {
               id={message.id}
               content={part.text}
             />
+          );
+        } else if (type === "file") {
+          const isImage =
+            part.mediaType === "image" ||
+            part.mediaType?.startsWith("image/");
+
+          if (isImage) {
+            return (
+              <img
+                key={`${message.id}-file-${index}`}
+                src={part.url}
+                alt={part.filename ?? "attachment"}
+                className="max-w-full sm:max-w-sm max-h-80 w-auto object-contain rounded-xl border border-gray-200 my-2"
+              />
+            );
+          }
+
+          return (
+            <a
+              key={`${message.id}-file-${index}`}
+              href={part.url}
+              download={part.filename}
+              className="inline-block my-2 px-3 py-2 rounded-xl border border-gray-200 bg-gray-50 text-sm text-gray-700 hover:bg-gray-100"
+            >
+              {part.filename ?? "Attachment"}
+            </a>
           );
         } else if (type === "step-start") {
           if (index > 0) {
@@ -80,7 +107,17 @@ export default function MessageContent({ message }: MessageContentProps) {
               />
             );
           }
+        } else if (type === "reasoning") {
+          return (
+            <ReasoningDisplay
+              key={`${message.id}-reasoning-${part.id ?? index}`}
+              text={part.text}
+              state={part.state}
+            />
+          );
         } else if (process.env.NODE_ENV === "development") {
+          console.log(`Unsupported message part type: ${type}`, part);
+        
           return (
             <UnsupportedMessagePart
               key={`${message.id}-unsupported-${index}`}
