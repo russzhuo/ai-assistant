@@ -28,10 +28,6 @@ export function ChatMessages({
   //   messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   // }, [messages, isLoading, interruptedMessageId]);
 
-  useEffect(() => {
-    window._messages = messages;
-  },[messages]);
-
   return (
     <div className="flex-1 min-h-0 overflow-y-auto px-4 py-6">
       <div className="mx-auto w-full max-w-4xl space-y-6">
