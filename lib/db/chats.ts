@@ -4,6 +4,7 @@ import { buildTitlePrompt } from "../ai/prompt";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { weatherTool } from "../tools/weather";
 import { webSearch } from "@exalabs/ai-sdk";
+import { deepSeekV4Flash } from "../ai/deepseek";
 
 const createChat = async (
   supabaseClient: Awaited<ReturnType<typeof createServerSupabaseClient>>,
@@ -32,7 +33,7 @@ const generateChatTitle = async (
 ) => {
   try {
     const result = await generateText({
-      model: qwenPlus,
+      model: deepSeekV4Flash,
       messages: await convertToModelMessages([
         {
           role: "user",
@@ -74,4 +75,41 @@ const generateChatTitle = async (
   }
 };
 
-export { generateChatTitle, createChat };
+const deleteChat = async (
+  supabaseClient: Awaited<ReturnType<typeof createServerSupabaseClient>>,
+  chatId: string,
+  userId: string,
+) => {
+  // Delete messages first in case the FK has no ON DELETE CASCADE.
+  // const { error: messagesError } = await supabaseClient
+  //   .from("messages")
+  //   .delete()
+  //   .eq("chat_id", chatId);
+
+  // if (messagesError) {
+  // //   console.error("Failed to delete chat messages:", messagesError);
+  // //   return { error: messagesError };
+  // }
+
+  const { error: chatError, data } = await supabaseClient
+    .from("chats")
+    .delete()
+    .eq("id", chatId)
+    .eq("user_id", userId)
+    .select("id");
+
+  const deleted = data?.length ?? 0;
+  if (deleted === 0) {
+    console.info(`No chat deleted: ${chatId} user: ${userId}`);
+    return { error: new Error("Chat not found") };
+  }
+
+  if (chatError) {
+    console.error("Failed to delete chat:", chatError);
+    return { error: chatError };
+  }
+
+  return { error: null };
+};
+
+export { generateChatTitle, createChat, deleteChat };

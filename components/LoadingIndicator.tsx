@@ -1,6 +1,8 @@
 import cn from "classnames";
 
-export default function LoadingIndicator() {
+export default function LoadingIndicator({
+  label = "",
+}) {
   return (
     <div className="flex justify-start">
       <div
@@ -9,7 +11,7 @@ export default function LoadingIndicator() {
           "text-gray-500 text-sm font-medium animate-pulse",
         )}
       >
-        Thinking...
+        {label || `Thinking...`}
       </div>
     </div>
   );

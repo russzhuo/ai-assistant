@@ -57,6 +57,38 @@ export const useCreateChat = () => {
   });
 };
 
+async function deleteChatFn(chatId: string): Promise<void> {
+  const res = await fetch(`/api/chats/${chatId}`, {
+    method: "DELETE",
+  });
+
+  if (!res.ok) {
+    const errorBody = await res.json().catch(() => ({}));
+    throw new Error(errorBody.error ?? "Failed to delete chat");
+  }
+}
+
+export const useDeleteChat = () => {
+  const queryClient = useQueryClient();
+  const { user } = useUser();
+
+  return useMutation({
+    mutationFn: deleteChatFn,
+
+    onSuccess: () => {
+      if (user?.id) {
+        queryClient.invalidateQueries({
+          queryKey: chatKeys.ownedChats(user.id),
+        });
+      }
+    },
+
+    onError: (error) => {
+      console.error("Chat deletion failed:", error);
+    },
+  });
+};
+
 interface ChatData {
   title: string | null;
   messages: MessageRow[];
@@ -75,7 +107,7 @@ export const useOwnedChats = () => {
         .from("chats")
         .select("*")
         .eq("user_id", userId)
-        .order("updated_at", { ascending: true });
+        .order("updated_at", { ascending: false });
 
       if (chatsError) {
         throw chatsError;

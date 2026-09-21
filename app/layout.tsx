@@ -30,7 +30,7 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const main = <main className="flex-1">{children}</main>;
+  const main = <main className="flex-1 min-h-0 overflow-hidden">{children}</main>;
 
   return (
     <ClerkProvider>

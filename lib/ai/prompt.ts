@@ -51,6 +51,23 @@ Never search just to "be sure" or "double-check" general knowledge.
 `.trim();
 
 /**
+ * Rules specifically about how to respond after using the weather tool
+ */
+const WEATHER_RULES = `
+Rules for using the weather tool:
+
+After calling the weather tool, you MUST write a short text summary of the weather in your reply — never return only the tool result/card without any text.
+
+The summary must be brief and conversational, written in the same language the user used. Do NOT use tables, bullet lists, or any heavy formatting — just 2-4 short sentences of flowing prose.
+
+Cover:
+- Current conditions: temperature, condition, feels-like, humidity and wind.
+- A very brief outlook for the next few days.
+
+End with a practical suggestion based on the weather: what the user should do and what they should avoid (e.g. carry an umbrella, dress warmly, stay hydrated, avoid going out, good day for outdoor activities, etc.).
+`.trim();
+
+/**
  * Builds the system prompt with current date inserted
  */
 export function buildSystemPrompt(): string {
@@ -64,6 +81,8 @@ Your internal knowledge goes roughly up to ${KNOWLEDGE_CUTOFF_DATE}.
 ${CORE_RULES}
 
 ${WEB_SEARCH_RULES}
+
+${WEATHER_RULES}
   `.trim();
 }
 

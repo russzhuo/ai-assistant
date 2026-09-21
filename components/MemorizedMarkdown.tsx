@@ -64,7 +64,7 @@ const MemoizedMarkdownBlock = memo(
             const match = /language-(\w+)/.exec(className || "");
             
             if (match) {
-              console.log(String(children))
+              // console.log(String(children))
               const codeString = String(children).replace(/\n$/, "");
               if (codeString) {
                 const lang = match[1];
@@ -118,7 +118,7 @@ export const MemoizedMarkdown = memo(
     const blocks = useMemo(() => parseMarkdownIntoBlocks(content), [content]);
 
     return (
-      <div className="prose lg:prose-lg">
+      <div className="prose md:prose-md prose-p:my-1 prose-p:leading-relaxed">
         {blocks.map((block, index) => (
           <MemoizedMarkdownBlock content={block} key={`${id}-block_${index}`} />
         ))}
