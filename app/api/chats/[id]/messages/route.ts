@@ -90,7 +90,7 @@ export async function POST(
       // Allow a follow-up step so the model can summarize tool results (e.g.
       // weather) instead of stopping right after the tool call. Without this,
       // the reply only contains the tool card and no text.
-      stopWhen: stepCountIs(2),
+      stopWhen: stepCountIs(5),
       tools: {
         weather: weatherTool,
 

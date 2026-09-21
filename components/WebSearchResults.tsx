@@ -1,78 +1,71 @@
-// src/components/chat/WebSearchResults.tsx
+"use client";
+
+import { useState } from "react";
 import Link from "next/link";
-import { MemoizedMarkdown } from "./MemorizedMarkdown";
+import { ChevronDown, Globe } from "lucide-react";
 import { ExaSearchResult } from "@exalabs/ai-sdk";
 
 interface WebSearchResultsProps {
-  summary: string;
   results: ExaSearchResult[];
-  messageId: string;
 }
 
-// Unit test focuses on individual modules, each module of the software is tested separately.
-// Integration test examines how 2 or more modules work together and if they are interacted with each other correctly
+const getDomain = (url: string): string => {
+  try {
+    return new URL(url).hostname.replace(/^www\./, "");
+  } catch {
+    return url;
+  }
+};
 
-export default function WebSearchResults({
-  summary,
-  results,
-  messageId,
-}: WebSearchResultsProps) {
+export default function WebSearchResults({ results }: WebSearchResultsProps) {
+  const [open, setOpen] = useState(false);
+
+  if (results.length === 0) return null;
+
   return (
-    <div className="my-6 rounded-xl bg-white border border-gray-200/70">
-      <div className="border-b border-gray-200/70 px-4 py-3 bg-gray-50/70">
-        <div className="flex items-center gap-2.5">
-          <strong>Web Search Results</strong>
-        </div>
-      </div>
+    <div className="my-3">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700 transition-colors cursor-pointer"
+      >
+        <Globe className="h-4 w-4" />
+        Sources ({results.length})
+        <ChevronDown
+          className={`h-4 w-4 transition-transform ${open ? "rotate-180" : ""}`}
+        />
+      </button>
 
-      <div className="p-4">
-        <MemoizedMarkdown id={messageId} content={summary} />
-
-        {results.length > 0 ? (
-          <div className="mt-5 space-y-3">
-            {results.map((item, i) => (
+      {open && (
+        <ol className="mt-2 space-y-1">
+          {results.map((item, i) => (
+            <li key={i} className="flex items-center gap-2 text-sm">
+              <span className="w-4 shrink-0 text-right text-xs text-gray-400">
+                {i + 1}.
+              </span>
+              {item.favicon ? (
+                <img
+                  src={item.favicon}
+                  alt=""
+                  className="h-4 w-4 shrink-0 rounded object-contain"
+                  onError={(e) => (e.currentTarget.style.display = "none")}
+                />
+              ) : (
+                <Globe className="h-4 w-4 shrink-0 text-gray-300" />
+              )}
               <Link
-                key={i}
                 href={item.url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="hover:bg-white hover:-translate-y-0.5 hover:shadow-md bg-white/85 group block rounded-lg p-3.5 transition-colors"
+                title={item.title}
+                className="truncate text-blue-600 hover:underline"
               >
-                <div className="flex items-start gap-3">
-                  {item.favicon && (
-                    <img
-                      src={item.favicon}
-                      alt=""
-                      className="mt-1 h-5 w-5 shrink-0 rounded object-contain"
-                      onError={(e) => (e.currentTarget.style.display = "none")}
-                    />
-                  )}
-
-                  <div className="min-w-0 flex-1">
-                    <h4 className="font-medium leading-snug text-gray-800 group-hover:text-blue-600 transition-colors line-clamp-2">
-                      {item.title}
-                    </h4>
-
-                    <p className="mt-1.5 text-sm text-gray-500 line-clamp-2">
-                      {item.text ||
-                        "No preview available"}
-                    </p>
-
-
-                    <div className="mt-1.5 text-xs text-gray-400 truncate">
-                      {item.url}
-                    </div>
-                  </div>
-                </div>
+                {getDomain(item.url)}
               </Link>
-            ))}
-          </div>
-        ) : (
-          <div className="py-8 text-center text-sm text-gray-400 italic">
-            No search results found
-          </div>
-        )}
-      </div>
+            </li>
+          ))}
+        </ol>
+      )}
     </div>
   );
 }

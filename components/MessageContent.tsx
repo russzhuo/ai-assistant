@@ -1,6 +1,5 @@
-import WeatherCard from "./WeatherCard";
 import UnsupportedMessagePart from "./UnsupportedMessagePart";
-import { CurrentWeatherDisplay, DailyForecast } from "../lib/utils/whether";
+import { CurrentWeatherDisplay } from "../lib/utils/whether";
 import { WebSearchOutput } from "@/types/exa";
 import WebSearchResults from "./WebSearchResults";
 import { MemoizedMarkdown } from "./MemorizedMarkdown";
@@ -67,22 +66,34 @@ export default function MessageContent({ message }: MessageContentProps) {
           const state = part.state;
           if (state === "output-available") {
             const output = part.output as {
-              current: CurrentWeatherDisplay;
-              forecast: DailyForecast[];
+              current?: CurrentWeatherDisplay;
             };
 
+            if (!output.current) {
+              return (
+                <p
+                  key={`${message.id}-weather-${index}`}
+                  className="my-2 text-sm text-gray-400"
+                >
+                  Weather data unavailable
+                </p>
+              );
+            }
+
             return (
-              <WeatherCard
-                key={`${message.id}-weather`}
-                current={output.current}
-                forecast={output.forecast}
-              />
+              <p
+                key={`${message.id}-weather-${index}`}
+                className="my-2 text-sm text-gray-500"
+              >
+                🌡️ {output.current.temp}° · {output.current.condition} ·{" "}
+                {output.current.location}
+              </p>
             );
           } else if (state === "input-available") {
             return (
               <ToolPending
                 toolName="WeatherSearch"
-                key={`${message.id}-weathersearch-pending`}
+                key={`${message.id}-weathersearch-pending-${index}`}
               />
             );
           }
@@ -93,17 +104,15 @@ export default function MessageContent({ message }: MessageContentProps) {
 
             return (
               <WebSearchResults
-                key={`${message.id}-websearch`}
-                summary={output.results?.at(0)?.summary ?? ""}
+                key={`${message.id}-websearch-${index}`}
                 results={output.results ?? []}
-                messageId={message.id}
               />
             );
           } else if (state === "input-available") {
             return (
               <ToolPending
                 toolName="WebSearch"
-                key={`${message.id}-websearch-pending`}
+                key={`${message.id}-websearch-pending-${index}`}
               />
             );
           }

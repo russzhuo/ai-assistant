@@ -64,7 +64,7 @@ const MemoizedMarkdownBlock = memo(
             const match = /language-(\w+)/.exec(className || "");
             
             if (match) {
-              console.log(String(children))
+              // console.log(String(children))
               const codeString = String(children).replace(/\n$/, "");
               if (codeString) {
                 const lang = match[1];
