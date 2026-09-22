@@ -5,7 +5,7 @@ import { UIMessage } from "ai";
 
 interface MessageBubbleProps {
   message: UIMessage;
-  interrupted?: boolean;
+  showContinue?: boolean;
   onContinue?: () => void;
   onDiscard?: () => void;
   continueDisabled?: boolean;
@@ -13,7 +13,7 @@ interface MessageBubbleProps {
 
 const MessageBubble: React.FC<MessageBubbleProps> = ({
   message,
-  interrupted = false,
+  showContinue = false,
   onContinue,
   onDiscard,
   continueDisabled = false,
@@ -27,12 +27,12 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
         isUser
           ? "user-message bg-linear-to-r from-blue-500 to-blue-600 text-white rounded-br-4xl"
           : "assistant-message bg-white text-gray-800 rounded-bl-4xl border border-gray-200/70",
-        interrupted && !isUser && "border-amber-300 ring-1 ring-amber-200",
+        showContinue && !isUser && "border-amber-300 ring-1 ring-amber-200",
       )}
     >
       <MessageContent message={message} />
 
-      {interrupted && !isUser && onContinue && (
+      {showContinue && !isUser && onContinue && (
         <div className="mt-3 pt-3 border-t border-amber-200/80 flex flex-col gap-2">
           <p className="text text-amber-700">
             Connection lost — reply truncated. Partial content kept.

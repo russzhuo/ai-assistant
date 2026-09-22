@@ -1,11 +1,7 @@
-import {
-  ChangeEventHandler,
-  FormEventHandler,
-  useEffect,
-  useRef,
-} from "react";
+import { ChangeEventHandler, FormEventHandler, useEffect, useRef } from "react";
 import { ArrowUp, ImagePlus, X } from "lucide-react";
 import { Button } from "./Button";
+import { ChatStatus } from "ai";
 
 export interface Attachment {
   id: string;
@@ -20,11 +16,11 @@ interface Props {
   inputAllowed: boolean;
   submitAllowed: boolean;
   onSubmit: FormEventHandler<HTMLFormElement>;
-  isStreaming: boolean;
   onStop: () => void;
   attachments?: Attachment[];
   onAddFiles?: (files: File[]) => void;
   onRemoveAttachment?: (id: string) => void;
+  status: ChatStatus;
 }
 
 const MessageInput: React.FC<Props> = ({
@@ -33,15 +29,17 @@ const MessageInput: React.FC<Props> = ({
   onChange,
   inputAllowed,
   submitAllowed,
-  isStreaming,
   onStop,
   attachments,
   onAddFiles,
   onRemoveAttachment,
+  status,
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const canAttach = Boolean(onAddFiles && !isStreaming);
+  const canAttach = Boolean(
+    onAddFiles && status !== "streaming" && status !== "submitted",
+  );
 
   const autoResize = () => {
     const el = textareaRef.current;
@@ -148,7 +146,7 @@ const MessageInput: React.FC<Props> = ({
               )}
             </div>
 
-            {isStreaming ? (
+            {status === "streaming" || status === "submitted" ? (
               <Button variant="destructive" type="button" onClick={onStop}>
                 Stop
               </Button>

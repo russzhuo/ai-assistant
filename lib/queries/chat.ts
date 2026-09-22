@@ -89,6 +89,37 @@ export const useDeleteChat = () => {
   });
 };
 
+async function deleteLatestAssistantMessageFn(chatId: string): Promise<void> {
+  const res = await fetch(`/api/chats/${chatId}/messages`, {
+    method: "DELETE",
+  });
+
+  if (!res.ok) {
+    const errorBody = await res.json().catch(() => ({}));
+    throw new Error(errorBody.error ?? "Failed to delete latest assistant message");
+  }
+}
+
+export const useDeleteLatestAssistantMessage = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: deleteLatestAssistantMessageFn,
+
+    onSuccess: (_data, chatId) => {
+      // The latest assistant message was removed server-side, so refresh the
+      // cached messages for this chat rather than resurrecting the stale row.
+      queryClient.invalidateQueries({
+        queryKey: chatKeys.chat(chatId),
+      });
+    },
+
+    onError: (error) => {
+      console.error("Failed to delete latest assistant message:", error);
+    },
+  });
+};
+
 interface ChatData {
   title: string | null;
   messages: MessageRow[];

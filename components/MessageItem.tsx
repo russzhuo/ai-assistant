@@ -4,7 +4,7 @@ import cn from "classnames";
 
 type MessageItemProps = {
   message: UIMessage;
-  interrupted?: boolean;
+  showContinue?: boolean;
   onContinue?: () => void;
   onDiscard?: () => void;
   continueDisabled?: boolean;
@@ -12,7 +12,7 @@ type MessageItemProps = {
 
 export const MessageItem: React.FC<MessageItemProps> = ({
   message,
-  interrupted = false,
+  showContinue = false,
   onContinue,
   onDiscard,
   continueDisabled = false,
@@ -23,7 +23,7 @@ export const MessageItem: React.FC<MessageItemProps> = ({
     <div className={cn("flex", isUser ? "justify-end" : "justify-start")}>
       <MessageBubble
         message={message}
-        interrupted={interrupted}
+        showContinue={showContinue}
         onContinue={onContinue}
         onDiscard={onDiscard}
         continueDisabled={continueDisabled}

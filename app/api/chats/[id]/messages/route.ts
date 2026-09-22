@@ -1,18 +1,30 @@
 import { qwenPlus } from "@/lib/ai/openai";
 import { buildSystemPrompt } from "@/lib/ai/prompt";
-import { badRequest, serverError, unauthorized } from "@/lib/api/responses";
+import { badRequest, ok, serverError, unauthorized } from "@/lib/api/responses";
 import { generateChatTitle } from "@/lib/db/chats";
 import {
+  deleteLatestAssistantMessage,
   mergeContinuationIntoLatestAssistant,
+  persistAssistantStream,
   saveMessageToSupabase,
+  upsertLatestAssistantMessage,
 } from "@/lib/db/messages";
-import { mergeAssistantText } from "@/lib/chat/stream-resume";
+import {
+  buildContinuePrompt,
+  hasMessageText,
+  mergeAssistantText,
+} from "@/lib/chat/stream-resume";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { weatherTool } from "@/lib/tools/weather";
 import { currentUser } from "@clerk/nextjs/server";
-import { convertToModelMessages, stepCountIs, streamText, UIMessage } from "ai";
+import {
+  convertToModelMessages,
+  createUIMessageStreamResponse,
+  stepCountIs,
+  streamText,
+  UIMessage,
+} from "ai";
 import { webSearch } from "@exalabs/ai-sdk";
-import { deepseek } from "@ai-sdk/deepseek";
 import { deepSeekV4Flash, deepSeekV4FlashVision } from "@/lib/ai/deepseek";
 
 export async function POST(
@@ -43,10 +55,11 @@ export async function POST(
         ? body.persistUserMessage
         : true;
     const resumePartialText =
-      typeof body.resumePartialText === "string" && body.resumePartialText.trim()
+      typeof body.resumePartialText === "string" &&
+      body.resumePartialText.trim()
         ? body.resumePartialText.trim()
         : null;
-    const isResume = Boolean(resumePartialText);
+    const isResume = resumePartialText != null;
 
     // console.log(`persistUserMessage: `, persistUserMessage, `isResume: `, isResume);
     const lastMessage = messages[messages.length - 1];
@@ -54,11 +67,7 @@ export async function POST(
       (p) => p.type === "text" && p.text?.trim(),
     );
     const hasFile = lastMessage?.parts?.some((p) => p.type === "file");
-    if (
-      !lastMessage ||
-      lastMessage.role !== "user" ||
-      (!hasText && !hasFile)
-    ) {
+    if (!lastMessage || lastMessage.role !== "user" || (!hasText && !hasFile)) {
       return badRequest(
         `The last message must be from user with non-empty content`,
       );
@@ -91,6 +100,7 @@ export async function POST(
       // weather) instead of stopping right after the tool call. Without this,
       // the reply only contains the tool card and no text.
       stopWhen: stepCountIs(5),
+      abortSignal: request.signal,
       tools: {
         weather: weatherTool,
 
@@ -108,21 +118,46 @@ export async function POST(
       },
     });
 
-    return result.toUIMessageStreamResponse({
+    console.log(
+      isResume
+        ? `Continuing stream for chat ${chatId}`
+        : `Starting new stream for chat ${chatId}`,
+    );
+
+    const uiStream = result.toUIMessageStream({
       originalMessages: messages,
-      onFinish: async ({ messages: finalMessages }) => {
+      onFinish: async ({ messages: finalMessages, isAborted }) => {
         const finished = finalMessages[finalMessages.length - 1];
+
+        // Interrupted mid-stream: persist the partial assistant so a later
+        // "continue" can merge into it (and it survives a reload).
+        if (finished && finished.role === "assistant" && isAborted) {
+          if (hasMessageText(finished)) {
+            await upsertLatestAssistantMessage(
+              supabaseClient,
+              chatId,
+              finished,
+            );
+          }
+          return;
+        }
+
         if (finished && finished.role === "assistant") {
-          if (isResume && resumePartialText) {
+          if (isResume) {
+            console.log(
+              `Merging continuation into latest assistant message for chat ${chatId}`,
+            );
             await mergeContinuationIntoLatestAssistant(
               supabaseClient,
               chatId,
-              resumePartialText,
-              finished,
-              mergeAssistantText,
+              finalMessages
             );
           } else {
-            await saveMessageToSupabase(supabaseClient, chatId, finished);
+            // await upsertLatestAssistantMessage(
+            //   supabaseClient,
+            //   chatId,
+            //   finished,
+            // );
           }
         }
 
@@ -148,8 +183,47 @@ export async function POST(
         }
       },
     });
+
+    const [clientStream, persistStream] = uiStream.tee();
+
+    if (!isResume) {
+      void persistAssistantStream(supabaseClient, chatId, persistStream);
+    }
+
+    return createUIMessageStreamResponse({
+      stream: clientStream,
+    });
   } catch (error) {
     console.error("Chat API error:", error);
+    return serverError();
+  }
+}
+
+/**
+ * Discard the latest assistant message for a chat. Used when the user
+ * abandons an interrupted reply instead of continuing it.
+ */
+export async function DELETE(
+  _request: Request,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  try {
+    const user = await currentUser();
+    if (!user) {
+      return unauthorized();
+    }
+
+    const { id: chatId } = await params;
+    if (!chatId || typeof chatId !== "string" || chatId.trim() === "") {
+      return badRequest(`Chat ID is required and must be a non-empty string`);
+    }
+
+    const supabaseClient = await createServerSupabaseClient();
+    await deleteLatestAssistantMessage(supabaseClient, chatId);
+
+    return ok({ deleted: true });
+  } catch (error) {
+    console.error("Discard interrupted message error:", error);
     return serverError();
   }
 }

@@ -16,6 +16,17 @@ export function hasMessageText(message: UIMessage | undefined | null): boolean {
   return getMessageText(message).length > 0;
 }
 
+/**
+ * True if a part is text or reasoning still marked as "streaming"
+ * (e.g. an interrupted stream that never emitted its final "done" state).
+ */
+export function isStreamingPart(part: UIMessage["parts"][number]): boolean {
+  return (
+    (part.type === "text" || part.type === "reasoning") &&
+    part.state === "streaming"
+  );
+}
+
 export function isContinuePromptMessage(message: UIMessage): boolean {
   const meta = message.metadata as { kind?: string } | undefined;
   if (meta?.kind === STREAM_CONTINUE_KIND) return true;
@@ -36,6 +47,27 @@ export function buildContinuePrompt(partialAssistantText: string): string {
     "Please continue generating from where it left off.",
     "Do not repeat content that already appears above; continue seamlessly in the same language and style.",
   ].join("\n");
+}
+
+export function mergeContinuationIntoMessages(messages: UIMessage[]) {
+  const continuation = messages.at(-1);
+  const interrupted = messages.at(-2);
+
+  if (!continuation || !interrupted) return messages;
+  if (interrupted.role !== "assistant") return messages;
+  if (continuation.role !== "assistant") return messages;
+
+  const partialText = getMessageText(interrupted);
+  const continuationText = getMessageText(continuation);
+  const mergedText = mergeAssistantText(partialText, continuationText);
+
+  return [
+    ...messages.slice(0, -2),
+    {
+      ...interrupted,
+      parts: finalizeTextParts(replaceTextParts(interrupted.parts, mergedText)),
+    },
+  ];
 }
 
 export function mergeAssistantText(
@@ -71,10 +103,10 @@ export function replaceTextParts(
  * reasoning spinner that never stops) because the SDK never emits their final
  * state. Apply this whenever finalizing a message.
  */
-export function finalizeParts(parts: UIMessage["parts"]): UIMessage["parts"] {
+export function finalizeTextParts(parts: UIMessage["parts"]): UIMessage["parts"] {
   return parts.map((p) => {
     if (
-      (p.type === "text" || p.type === "reasoning") &&
+      (p.type === "text") &&
       p.state === "streaming"
     ) {
       return { ...p, state: "done" as const };

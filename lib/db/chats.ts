@@ -44,12 +44,12 @@ const generateChatTitle = async (
     });
 
     let title = result.text?.trim() || "";
-    console.log(
-      "systemPrompt: ",
-      buildTitlePrompt(userMessage, assistantMessage),
-    );
+    // console.log(
+    //   "systemPrompt: ",
+    //   buildTitlePrompt(userMessage, assistantMessage),
+    // );
 
-    console.log("title: ", title);
+    // console.log("title: ", title);
 
     if (!title || title.length > 100) {
       title = "New Conversation";
@@ -59,7 +59,7 @@ const generateChatTitle = async (
       .from("chats")
       .update({ title })
       .eq("id", chatId);
-    console.log(data, error);
+    // console.log(data, error);
 
     if (error) {
       console.error("Failed to save chat title:", error);

@@ -1,26 +1,25 @@
 "use client";
 
-import { useChatData } from "@/lib/queries/chat";
+import {
+  useChatData,
+  useDeleteLatestAssistantMessage,
+} from "@/lib/queries/chat";
 import { useUser } from "@clerk/nextjs";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useChat } from "@ai-sdk/react";
-import { DefaultChatTransport, UIMessage, type FileUIPart } from "ai";
+import { DefaultChatTransport, type FileUIPart } from "ai";
 import { MessageInput, type Attachment } from "@/components/MessageInput";
 import { ChatMessages } from "@/components/ChatMessages";
 import {
   STREAM_CONTINUE_KIND,
   buildContinuePrompt,
-  finalizeParts,
   getMessageText,
   hasMessageText,
   isContinuePromptMessage,
-  mergeAssistantText,
-  replaceTextParts,
+  isStreamingPart,
+  mergeContinuationIntoMessages,
 } from "@/lib/chat/stream-resume";
-
-/** Shown inside an empty assistant bubble when the stream fails before any content arrives. */
-const STREAM_ERROR_TEXT = "⚠️ Couldn’t generate a reply. Please try again.";
 
 const readFileAsDataURL = (file: File): Promise<string> =>
   new Promise((resolve, reject) => {
@@ -37,14 +36,19 @@ export default function ChatRoom() {
 
   const [input, setInput] = useState("");
   const [attachments, setAttachments] = useState<Attachment[]>([]);
-  const [interruptedMessageId, setInterruptedMessageId] = useState<
-    string | null
-  >(null);
-  const resumePartialTextRef = useRef<string | null>(null);
-  const interruptedMessageIdRef = useRef<string | null>(null);
-  const suppressAutoKickRef = useRef(false);
+  const { data: chatData, isLoading } = useChatData(chatId, userId);
 
-  const { data: chatData } = useChatData(chatId, userId);
+  const { mutate: deleteLatestAssistantMessage } =
+    useDeleteLatestAssistantMessage();
+
+  const [isGeneratingContinuation, setIsGeneratingContinuation] =
+    useState(false);
+
+  // Tracks an in-flight "continue" so we know which partial message to fold the
+  // continuation into once the stream finishes. A ref avoids re-renders.
+  // const resumeRef = useRef<{ messageId: string; partialText: string } | null>(
+  //   null,
+  // );
 
   const historyMessages = useMemo(() => {
     return chatData?.messages ?? [];
@@ -52,160 +56,51 @@ export default function ChatRoom() {
 
   const title = chatData?.title ?? "";
 
-  const persistInterruptedAssistant = useCallback(
-    async (message: UIMessage) => {
-      if (!chatId || !hasMessageText(message)) return;
-      try {
-        await fetch(`/api/chats/${chatId}/messages/persist`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ message }),
-        });
-      } catch (err) {
-        console.error("Failed to persist interrupted assistant message:", err);
-      }
-    },
-    [chatId],
-  );
-
-  const { messages, sendMessage, setMessages, status, stop, clearError } =
-    useChat({
+  const {
+    messages,
+    sendMessage,
+    setMessages,
+    status,
+    stop,
+    clearError,
+    regenerate,
+  } = useChat({
     id: chatId,
     transport: new DefaultChatTransport({
       api: `/api/chats/${chatId}/messages`,
-      prepareSendMessagesRequest: ({
-        id,
-        messages: nextMessages,
-        body,
-        trigger,
-        messageId,
-        headers,
-        credentials,
-        api,
-      }) => {
-        const nextBody: Record<string, unknown> = {
-          ...(body ?? {}),
-          id,
-          messages: nextMessages,
-          trigger,
-          messageId,
-        };
-        return { body: nextBody, headers, credentials, api };
-      },
     }),
     onFinish: ({ message, isAbort, isDisconnect, isError }) => {
-      const failed = isAbort || isDisconnect || isError;
-
-      if (failed) {
-        if (message.role === "assistant") {
-          // The stream ended without the SDK emitting a final "done" state for
-          // text/reasoning parts (e.g. interrupted). Finalize them so spinners
-          // don't spin forever and the persisted message isn't stuck "streaming".
-          const finalized: UIMessage = {
-            ...message,
-            parts: finalizeParts(message.parts),
-          };
-
-          if (hasMessageText(finalized)) {
-            interruptedMessageIdRef.current = finalized.id;
-            setInterruptedMessageId(finalized.id);
-            const partial = getMessageText(finalized);
-            resumePartialTextRef.current = partial;
-            setMessages((prev) =>
-              prev.map((m) => (m.id === finalized.id ? finalized : m)),
-            );
-            void persistInterruptedAssistant(finalized);
-          } else {
-            // The stream failed before any content was generated, leaving the
-            // assistant bubble blank. Surface an error inside it instead.
-            setMessages((prev) =>
-              prev.map((m) =>
-                m.id === message.id
-                  ? {
-                      ...m,
-                      parts: [
-                        ...finalizeParts(m.parts),
-                        { type: "text" as const, text: STREAM_ERROR_TEXT },
-                      ],
-                    }
-                  : m,
-              ),
-            );
-          }
-        }
-        return;
-      }
-
-      // Successful stream — if this was a continue, fold continuation into the
-      // interrupted assistant bubble and drop the hidden continue prompt.
-      const partial = resumePartialTextRef.current;
-      const targetId = interruptedMessageIdRef.current;
-      if (!partial || message.role !== "assistant") {
-        return;
-      }
-
-      const mergedText = mergeAssistantText(partial, getMessageText(message));
-      // Preserve non-text parts (tool results) on the interrupted message,
-      // replacing only its text with the merged continuation.
-      const withMergedText = (base: UIMessage): UIMessage => ({
-        ...base,
-        parts: finalizeParts(replaceTextParts(base.parts, mergedText)),
-      });
-      setMessages((prev) => {
-        const withoutContinue = prev.filter((m) => !isContinuePromptMessage(m));
-        const withoutNewAssistant = withoutContinue.filter(
-          (m) => m.id !== message.id,
-        );
-        const idx = targetId
-          ? withoutNewAssistant.findIndex((m) => m.id === targetId)
-          : -1;
-
-        if (idx === -1) {
-          return withoutContinue.map((m) =>
-            m.id === message.id ? withMergedText(m) : m,
-          );
-        }
-
-        const next = [...withoutNewAssistant];
-        next[idx] = withMergedText(next[idx]);
-        return next;
-      });
-
-      resumePartialTextRef.current = null;
-      interruptedMessageIdRef.current = null;
-      setInterruptedMessageId(null);
+      setIsGeneratingContinuation(false);
+      setMessages(mergeContinuationIntoMessages);
     },
   });
 
+  // New chats land with a single persisted user message and no assistant
   useEffect(() => {
-    if (historyMessages.length > 0) {
-      // Persisted messages can have parts stuck in "streaming" state (e.g. an
-      // interrupted reply was saved mid-stream). Finalize them before render.
-      setMessages(
-        historyMessages.map((m) => ({ ...m, parts: finalizeParts(m.parts) })),
-      );
+    if (status !== "ready" || messages.length !== 1) {
+      return;
     }
-  }, [historyMessages, setMessages]);
 
-  useEffect(() => {
-    if (status !== "ready") return;
-    // Don't auto-kick while waiting for the user to continue an interrupted reply.
-    if (interruptedMessageId) return;
-    // Don't auto-retry after the user abandoned an interrupted reply.
-    if (suppressAutoKickRef.current) return;
-    const last = messages.at(-1);
-    if (last?.role === "user" && !isContinuePromptMessage(last)) {
-      const text = last.parts
-        .filter((p) => p.type === "text")
-        .map((p) => p.text)
-        .join(" ");
+    const latest = messages.at(-1);
+    if (latest?.role === "user") {
+      const text = getMessageText(latest);
 
       sendMessage(
-        { text, messageId: last.id },
+        { text, messageId: latest.id },
         { body: { persistUserMessage: false } },
       );
     }
-  }, [messages, sendMessage, status, interruptedMessageId]);
+  }, [sendMessage, status, messages]);
+
+  const seeded = useRef(false);
+
+  useEffect(() => {
+    if (seeded.current) return;
+    if (historyMessages.length === 0 || isLoading) return;
+
+    seeded.current = true;
+    setMessages(historyMessages);
+  }, [historyMessages, setMessages, isLoading]);
 
   const handleAddFiles = useCallback(async (files: File[]) => {
     const next = await Promise.all(
@@ -228,10 +123,7 @@ export default function ChatRoom() {
     const hasText = Boolean(input.trim());
     if (!hasText && attachments.length === 0) return;
 
-    interruptedMessageIdRef.current = null;
-    resumePartialTextRef.current = null;
-    suppressAutoKickRef.current = false;
-    setInterruptedMessageId(null);
+    // resumeRef.current = null;
 
     const files: FileUIPart[] = attachments.map((a) => ({
       type: "file",
@@ -250,59 +142,88 @@ export default function ChatRoom() {
     setAttachments([]);
   };
 
+  const isReady = status === "ready";
+  const isStreaming = status === "streaming";
+  const isSubmitted = status === "submitted";
+
+  const showContinue: boolean = useMemo(() => {
+    if (isLoading || messages.length === 0 || isGeneratingContinuation)
+      return false;
+
+    const latest = messages.at(-1);
+    if (latest?.role !== "assistant") return false;
+    if (!latest.parts.some(isStreamingPart)) {
+      return false;
+    }
+
+    if (isSubmitted || isStreaming) {
+      return false;
+    }
+
+    return true;
+  }, [messages, isLoading, isStreaming, isSubmitted, isGeneratingContinuation]);
+
+  const continueMessageId = showContinue ? (messages.at(-1)?.id ?? null) : null;
+
+  useEffect(() => {
+    (window as any)._messages = messages;
+    (window as any)._regenerate = regenerate;
+  }, [messages]);
+
   const handleContinue = () => {
-    const partialMessage =
-      messages.find((m) => m.id === interruptedMessageId) ??
-      (messages.at(-1)?.role === "assistant" ? messages.at(-1) : undefined);
+    const interruptedMessage = messages.at(-1);
+    if (!interruptedMessage || interruptedMessage.role !== "assistant") return;
 
-    if (!partialMessage || !hasMessageText(partialMessage)) return;
-
-    const partialText = getMessageText(partialMessage);
-    interruptedMessageIdRef.current = partialMessage.id;
-    resumePartialTextRef.current = partialText;
-    setInterruptedMessageId(partialMessage.id);
-    clearError();
-
-    sendMessage(
-      {
-        text: buildContinuePrompt(partialText),
-        metadata: { kind: STREAM_CONTINUE_KIND },
-      },
-      { body: { persistUserMessage: false, resumePartialText: partialText } },
+    const hasNonTextPartStreaming = interruptedMessage.parts.some(
+      (p) => isStreamingPart(p) && p.type !== "text",
     );
+
+    const doGenerateContinuation = (callback: () => void) => {
+      clearError();
+      setIsGeneratingContinuation(true);
+      callback();
+    };
+
+    if (hasNonTextPartStreaming) {
+      doGenerateContinuation(() => regenerate());
+      return;
+    }
+
+    if (!interruptedMessage || !hasMessageText(interruptedMessage)) return;
+
+    doGenerateContinuation(() => {
+      const partialText = getMessageText(interruptedMessage);
+
+      sendMessage(
+        {
+          text: buildContinuePrompt(partialText),
+          metadata: { kind: STREAM_CONTINUE_KIND },
+        },
+        { body: { persistUserMessage: false, resumePartialText: partialText } },
+      );
+    });
   };
 
   const handleDiscard = () => {
-    const targetId = interruptedMessageIdRef.current;
+    const targetId = messages.at(-1)?.id;
 
-    interruptedMessageIdRef.current = null;
-    resumePartialTextRef.current = null;
-    suppressAutoKickRef.current = true;
-    setInterruptedMessageId(null);
+    // resumeRef.current = null;
+    clearError();
 
     if (targetId) {
       setMessages((prev) => prev.filter((m) => m.id !== targetId));
     }
 
-    clearError();
-
     if (chatId) {
-      void fetch(`/api/chats/${chatId}/messages/persist`, {
-        method: "DELETE",
-      }).catch((err) => {
-        console.error("Failed to discard interrupted message:", err);
-      });
+      deleteLatestAssistantMessage(chatId);
     }
   };
 
-  const isReady = status === "ready";
-  const isStreaming = status === "submitted" || status === "streaming";
-  const showContinue = Boolean(interruptedMessageId) && !isStreaming;
+  const visibleMessages = useMemo(() => {
+    const filered = messages.filter((m) => !isContinuePromptMessage(m));
 
-  const visibleMessages = useMemo(
-    () => messages.filter((m) => !isContinuePromptMessage(m)),
-    [messages],
-  );
+    return mergeContinuationIntoMessages(filered);
+  }, [messages]);
 
   return (
     <div className="h-full flex flex-col bg-gray-50/40">
@@ -315,7 +236,7 @@ export default function ChatRoom() {
       <ChatMessages
         messages={visibleMessages}
         isLoading={status === "submitted"}
-        interruptedMessageId={showContinue ? interruptedMessageId : null}
+        continueMessageId={continueMessageId}
         onContinue={handleContinue}
         onDiscard={handleDiscard}
         continueDisabled={isStreaming}
@@ -331,7 +252,7 @@ export default function ChatRoom() {
           !showContinue
         }
         inputAllowed={isReady || status === "error"}
-        isStreaming={isStreaming}
+        status={status}
         onStop={stop}
         attachments={attachments}
         onAddFiles={handleAddFiles}

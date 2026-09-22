@@ -1,5 +1,10 @@
-import { UIMessage } from "ai";
-import { replaceTextParts } from "../chat/stream-resume";
+import { readUIMessageStream, UIMessage, type UIMessageChunk } from "ai";
+import {
+  finalizeTextParts,
+  getMessageText,
+  mergeContinuationIntoMessages,
+  replaceTextParts,
+} from "../chat/stream-resume";
 import { createServerSupabaseClient } from "../supabase/server";
 
 type SupabaseClient = Awaited<ReturnType<typeof createServerSupabaseClient>>;
@@ -71,47 +76,50 @@ const upsertLatestAssistantMessage = async (
 const mergeContinuationIntoLatestAssistant = async (
   supabaseClient: SupabaseClient,
   chatId: string,
-  partialText: string,
-  continuation: UIMessage,
-  mergeText: (partial: string, next: string) => string,
+  messages: UIMessage[],
 ) => {
-  const continuationText = continuation.parts
-    .filter((p): p is { type: "text"; text: string } => p.type === "text")
-    .map((p) => p.text)
-    .join("");
-
-  const mergedText = mergeText(partialText, continuationText);
-
   const { data: existing, error: findError } = await findLatestMessage(
     supabaseClient,
     chatId,
   );
 
   if (findError) {
-    console.error("Failed to find assistant for merge:", findError);
-    await saveMessageToSupabase(supabaseClient, chatId, {
-      ...continuation,
-      parts: replaceTextParts(continuation.parts, mergedText),
-    });
-    return;
+    console.error("Failed to find latest message for merge:", findError);
   }
 
   if (existing && existing.role === "assistant") {
-    const { error } = await supabaseClient
-      .from("messages")
-      .update({ parts: replaceTextParts(existing.parts, mergedText) })
-      .eq("id", existing.id);
+    const mergedMessages = mergeContinuationIntoMessages(messages);
+    const latestMessage = mergedMessages.at(-1);
 
-    if (error) {
-      console.error("Failed to merge continuation into assistant message:", error);
+    if (latestMessage != null) {
+      const { error } = await supabaseClient
+        .from("messages")
+        .update({
+          parts: latestMessage.parts,
+        })
+        .eq("id", existing.id);
+
+      if (error) {
+        console.error(
+          "Failed to merge continuation into assistant message:",
+          error,
+        );
+      }
     }
-    return;
+  } else {
+    if (!existing) {
+      console.error("No existing assistant message found for merge.");
+    } else if (existing.role !== "assistant") {
+      console.error(
+        `Latest message is not an assistant message (role: ${existing.role}) for merge.`,
+      );
+    }
   }
 
-  await saveMessageToSupabase(supabaseClient, chatId, {
-    ...continuation,
-    parts: replaceTextParts(continuation.parts, mergedText),
-  });
+  // await saveMessageToSupabase(supabaseClient, chatId, {
+  //   ...continuation,
+  //   parts: replaceTextParts(continuation.parts, mergedText),
+  // });
 };
 
 /**
@@ -144,9 +152,74 @@ const deleteLatestAssistantMessage = async (
   }
 };
 
+/**
+ * Drain a tee'd copy of a UI message stream and keep the latest assistant
+ * message persisted in Supabase, throttled so we don't write on every token.
+ *
+ * Used for fresh (non-resume) streams: instead of only saving once the stream
+ * finishes (or is aborted), we save roughly every `throttleMs` so a hard server
+ * crash mid-reply still leaves the partial text behind. Resume streams skip
+ * this — their partial is already persisted from the interrupted reply, and the
+ * continuation is merged by `mergeContinuationIntoLatestAssistant`.
+ */
+const persistAssistantStream = async (
+  supabaseClient: SupabaseClient,
+  chatId: string,
+  chunkStream: ReadableStream<UIMessageChunk>,
+  throttleMs = 250,
+): Promise<void> => {
+  let latest: UIMessage | null = null;
+  let lastWriteAt = 0;
+  let lastWrittenText: string | null = null;
+
+  const flush = async () => {
+    if (!latest) return;
+    const message = latest;
+    const text = getMessageText(message);
+    if (text === lastWrittenText || text == null) {
+      latest = null;
+      return;
+    }
+
+    const started = Date.now();
+    try {
+      await upsertLatestAssistantMessage(supabaseClient, chatId, message);
+      lastWrittenText = text;
+      lastWriteAt = Date.now();
+      if (latest === message) latest = null;
+      console.log(
+        `[persist] flush ${Date.now() - started}ms, chars=${text.length}`,
+      );
+    } catch (err) {
+      console.error(
+        `[persist] flush failed after ${Date.now() - started}ms:`,
+        err,
+      );
+    }
+  };
+
+  try {
+    for await (const message of readUIMessageStream<UIMessage>({
+      stream: chunkStream,
+    })) {
+      if (message.role !== "assistant") continue;
+      latest = message;
+      if (Date.now() - lastWriteAt >= throttleMs) {
+        await flush();
+      }
+    }
+  } catch (err) {
+    // Aborted or errored mid-stream: fall through and flush the latest partial.
+    console.error("Assistant progress stream ended with an error:", err);
+  }
+
+  await flush();
+};
+
 export {
   saveMessageToSupabase,
   upsertLatestAssistantMessage,
   mergeContinuationIntoLatestAssistant,
   deleteLatestAssistantMessage,
+  persistAssistantStream,
 };

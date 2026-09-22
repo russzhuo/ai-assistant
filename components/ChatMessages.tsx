@@ -8,7 +8,7 @@ import { UIMessage } from "ai";
 type ChatMessagesProps = {
   messages: UIMessage[];
   isLoading: boolean;
-  interruptedMessageId?: string | null;
+  continueMessageId?: string | null;
   onContinue?: () => void;
   onDiscard?: () => void;
   continueDisabled?: boolean;
@@ -17,7 +17,7 @@ type ChatMessagesProps = {
 export function ChatMessages({
   messages,
   isLoading,
-  interruptedMessageId = null,
+  continueMessageId = null,
   onContinue,
   onDiscard,
   continueDisabled = false,
@@ -50,7 +50,10 @@ export function ChatMessages({
       top: el.scrollHeight,
       behavior: isNewMessage ? "smooth" : "auto",
     });
-  }, [messages, isLoading]);
+    // `continueMessageId` changes when the continue UI appears/disappears (e.g.
+    // after pressing Stop) — that grows the bubble without changing the message
+    // count, so include it to scroll the newly-revealed controls into view.
+  }, [messages, isLoading, continueMessageId]);
 
   return (
     <div
@@ -63,9 +66,9 @@ export function ChatMessages({
           <MessageItem
             key={m.id}
             message={m}
-            interrupted={m.id === interruptedMessageId}
-            onContinue={m.id === interruptedMessageId ? onContinue : undefined}
-            onDiscard={m.id === interruptedMessageId ? onDiscard : undefined}
+            showContinue={m.id === continueMessageId}
+            onContinue={m.id === continueMessageId ? onContinue : undefined}
+            onDiscard={m.id === continueMessageId ? onDiscard : undefined}
             continueDisabled={continueDisabled}
           />
         ))}

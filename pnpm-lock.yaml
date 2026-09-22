@@ -95,6 +95,9 @@ importers:
       remark-gfm:
         specifier: ^4.0.1
         version: 4.0.1
+      undici:
+        specifier: ^8.10.2
+        version: 8.10.2
       usehooks-ts:
         specifier: ^3.1.1
         version: 3.1.1(react@19.2.3)
@@ -3432,6 +3435,10 @@ packages:
   undici@7.29.1:
     resolution: {integrity: sha512-RYONW2MeafgYlkVOKYKkA/Ag7BmXqgIWCa8t1m0JcxrQg9pI9lEqRhAOruOBCbAohOa/gkCF+iPi9hrgvTzu6Q==}
     engines: {node: '>=20.18.1'}
+
+  undici@8.10.2:
+    resolution: {integrity: sha512-/y4/bH9YNU5hi9NIrpOuvGXFcxrj3CMrV+/AYpowAYTpHn8gX/XPFjNy766FPoYY0miQhdW977JFWKGNhBdwyQ==}
+    engines: {node: '>=22.19.0'}
 
   unified@11.0.5:
     resolution: {integrity: sha512-xKvGhPWw3k84Qjh8bI3ZeJjqnyadK+GEFtazSfZv/rKeTkTjOJho6mFqh2SM96iIcZokxiOpg78GazTSg8+KHA==}
@@ -7649,6 +7656,8 @@ snapshots:
   undici@6.28.1: {}
 
   undici@7.29.1: {}
+
+  undici@8.10.2: {}
 
   unified@11.0.5:
     dependencies:
